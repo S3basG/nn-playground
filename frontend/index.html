@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Playground</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 150px;
+        }
+
+        .slider-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .slider-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 16px;
+            color: #666;
+            min-height: 25px;
+        }
+
+        .accuracy {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        .visualizations {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        @media (max-width: 1024px) {
+            .visualizations {
+                flex-direction: column;
+            }
+        }
+
+        .viz-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .viz-section h2 {
+            color: #333;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            display: block;
+            width: 100%;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .error {
+            display: none;
+            text-align: center;
+            color: #d32f2f;
+            margin: 10px 0;
+            padding: 12px;
+            background: #ffebee;
+            border-radius: 8px;
+            border: 1px solid #ffcdd2;
+            font-size: 14px;
+        }
+
+        .error.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Neural Network Playground</h1>
+        
+        <div class="controls">
+            <div class="slider-group">
+                <label for="epochsSlider">Epochs</label>
+                <div class="slider-container">
+                    <input type="range" id="epochsSlider" min="50" max="500" value="200" step="10">
+                    <span class="slider-value" id="epochsValue">200</span>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label for="lrSlider">Learning Rate</label>
+                <div class="slider-container">
+                    <input type="range" id="lrSlider" min="0.0001" max="0.01" value="0.001" step="0.0001">
+                    <span class="slider-value" id="lrValue">0.001</span>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label for="hiddenSlider">Hidden Size</label>
+                <div class="slider-container">
+                    <input type="range" id="hiddenSlider" min="4" max="64" value="16" step="4">
+                    <span class="slider-value" id="hiddenValue">16</span>
+                </div>
+            </div>
+            <button id="trainBtn" onclick="trainModel()">Train Model</button>
+        </div>
+
+        <div class="loading" id="loading">Training model... Please wait.</div>
+        <div class="error" id="error"></div>
+        <div class="status" id="status"></div>
+
+        <div class="visualizations">
+            <div class="viz-section">
+                <h2>Decision Boundary & Dataset</h2>
+                <canvas id="mainCanvas"></canvas>
+            </div>
+            <div class="viz-section">
+                <h2>Training Loss</h2>
+                <canvas id="lossCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8000/train';
+        const mainCanvas = document.getElementById('mainCanvas');
+        const lossCanvas = document.getElementById('lossCanvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        const lossCtx = lossCanvas.getContext('2d');
+
+        // Slider elements
+        const epochsSlider = document.getElementById('epochsSlider');
+        const lrSlider = document.getElementById('lrSlider');
+        const hiddenSlider = document.getElementById('hiddenSlider');
+        const epochsValue = document.getElementById('epochsValue');
+        const lrValue = document.getElementById('lrValue');
+        const hiddenValue = document.getElementById('hiddenValue');
+
+        // Update slider value displays
+        epochsSlider.addEventListener('input', (e) => {
+            epochsValue.textContent = e.target.value;
+        });
+
+        lrSlider.addEventListener('input', (e) => {
+            lrValue.textContent = parseFloat(e.target.value).toFixed(4);
+        });
+
+        hiddenSlider.addEventListener('input', (e) => {
+            hiddenValue.textContent = e.target.value;
+        });
+
+        // Set canvas sizes based on device pixel ratio for crisp rendering
+        function setupCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Get container width for responsive sizing
+            const containerWidth = document.querySelector('.visualizations').clientWidth;
+            const isDesktop = window.innerWidth > 1024;
+            
+            if (isDesktop) {
+                // Side-by-side: each canvas gets half the width minus gap
+                const canvasSize = (containerWidth - 20) / 2;
+                const mainSize = Math.min(canvasSize, 600);
+                const lossWidth = canvasSize;
+                const lossHeight = 400;
+
+                // Main canvas (square)
+                mainCanvas.width = mainSize * dpr;
+                mainCanvas.height = mainSize * dpr;
+                mainCanvas.style.width = mainSize + 'px';
+                mainCanvas.style.height = mainSize + 'px';
+                mainCtx.scale(dpr, dpr);
+
+                // Loss canvas
+                lossCanvas.width = lossWidth * dpr;
+                lossCanvas.height = lossHeight * dpr;
+                lossCanvas.style.width = lossWidth + 'px';
+                lossCanvas.style.height = lossHeight + 'px';
+                lossCtx.scale(dpr, dpr);
+            } else {
+                // Stacked on mobile
+                const mainSize = Math.min(containerWidth - 40, 600);
+                const lossWidth = containerWidth - 40;
+                const lossHeight = 400;
+
+                mainCanvas.width = mainSize * dpr;
+                mainCanvas.height = mainSize * dpr;
+                mainCanvas.style.width = mainSize + 'px';
+                mainCanvas.style.height = mainSize + 'px';
+                mainCtx.scale(dpr, dpr);
+
+                lossCanvas.width = lossWidth * dpr;
+                lossCanvas.height = lossHeight * dpr;
+                lossCanvas.style.width = lossWidth + 'px';
+                lossCanvas.style.height = lossHeight + 'px';
+                lossCtx.scale(dpr, dpr);
+            }
+        }
+
+        setupCanvases();
+        window.addEventListener('resize', setupCanvases);
+
+        function trainModel() {
+            const btn = document.getElementById('trainBtn');
+            const loading = document.getElementById('loading');
+            const status = document.getElementById('status');
+            const error = document.getElementById('error');
+            
+            btn.disabled = true;
+            loading.classList.add('active');
+            error.classList.remove('active');
+            status.textContent = '';
+
+            // Get values from sliders
+            const epochs = parseInt(epochsSlider.value);
+            const lr = parseFloat(lrSlider.value);
+            const hidden = parseInt(hiddenSlider.value);
+
+            const requestBody = {
+                n_samples: 1000,
+                seed: 0,
+                epochs: epochs,
+                batch_size: 32,
+                lr: lr,
+                hidden: hidden,
+                grad_clip: 5.0,
+                grid_size: 140
+            };
+
+            fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || `HTTP error! status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                renderVisualizations(data);
+                status.innerHTML = `Training complete! Final accuracy: <span class="accuracy">${(data.final_accuracy * 100).toFixed(2)}%</span>`;
+                loading.classList.remove('active');
+                btn.disabled = false;
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                error.textContent = `Error: ${err.message}`;
+                error.classList.add('active');
+                loading.classList.remove('active');
+                btn.disabled = false;
+            });
+        }
+
+        function renderVisualizations(data) {
+            renderDecisionBoundary(data);
+            renderLossCurve(data);
+        }
+
+        function renderDecisionBoundary(data) {
+            const ctx = mainCtx;
+            const width = mainCanvas.width / (window.devicePixelRatio || 1);
+            const height = mainCanvas.height / (window.devicePixelRatio || 1);
+
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+
+            const boundary = data.decision_boundary;
+            const xMin = boundary.x_min;
+            const xMax = boundary.x_max;
+            const yMin = boundary.y_min;
+            const yMax = boundary.y_max;
+            const gridSize = boundary.grid_size;
+            const probs = boundary.probs_class1; // Flattened probabilities
+
+            // Draw heatmap
+            const cellWidth = width / gridSize;
+            const cellHeight = height / gridSize;
+
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const idx = i * gridSize + j;
+                    const prob = probs[idx];
+                    const color = probabilityToColor(prob);
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(
+                        j * cellWidth,
+                        i * cellHeight,
+                        cellWidth,
+                        cellHeight
+                    );
+                }
+            }
+
+            // Draw scatter plot of dataset points
+            const X = data.X; // List of [x, y] coordinates
+            const y = data.y; // List of labels
+
+            for (let i = 0; i < X.length; i++) {
+                const point = X[i];
+                const label = y[i];
+                const canvasX = worldToCanvasX(point[0], xMin, xMax, width);
+                const canvasY = worldToCanvasY(point[1], yMin, yMax, height);
+                
+                ctx.fillStyle = label === 0 ? '#2196F3' : '#F44336'; // Blue for class 0, red for class 1
+                ctx.beginPath();
+                ctx.arc(canvasX, canvasY, 4, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Add white border for visibility
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            // Draw border
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, width, height);
+        }
+
+        function renderLossCurve(data) {
+            const ctx = lossCtx;
+            const width = lossCanvas.width / (window.devicePixelRatio || 1);
+            const height = lossCanvas.height / (window.devicePixelRatio || 1);
+            const padding = 50;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+
+            const losses = data.losses || data.loss_history;
+            if (losses.length === 0) return;
+
+            // Find min and max for scaling
+            const minLoss = Math.min(...losses);
+            const maxLoss = Math.max(...losses);
+            const lossRange = maxLoss - minLoss || 1;
+
+            const plotWidth = width - 2 * padding;
+            const plotHeight = height - 2 * padding;
+
+            // Draw background
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(padding, padding, plotWidth, plotHeight);
+
+            // Draw grid lines
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            const numGridLines = 5;
+            for (let i = 0; i <= numGridLines; i++) {
+                const y = padding + (i / numGridLines) * plotHeight;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+
+            // Draw loss curve
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+
+            for (let i = 0; i < losses.length; i++) {
+                const x = padding + (i / (losses.length - 1)) * plotWidth;
+                const normalizedLoss = (losses[i] - minLoss) / lossRange;
+                const y = height - padding - normalizedLoss * plotHeight;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+
+            // Draw points
+            ctx.fillStyle = '#667eea';
+            for (let i = 0; i < losses.length; i += Math.max(1, Math.floor(losses.length / 50))) {
+                const x = padding + (i / (losses.length - 1)) * plotWidth;
+                const normalizedLoss = (losses[i] - minLoss) / lossRange;
+                const y = height - padding - normalizedLoss * plotHeight;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            // Draw labels
+            ctx.fillStyle = '#333';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Epoch', width / 2, height - 10);
+            
+            ctx.save();
+            ctx.translate(20, height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText('Loss', 0, 0);
+            ctx.restore();
+
+            // Draw min/max labels
+            ctx.textAlign = 'right';
+            ctx.fillText(maxLoss.toFixed(3), padding - 10, padding + 5);
+            ctx.fillText(minLoss.toFixed(3), padding - 10, height - padding + 5);
+            
+            // Draw epoch labels
+            ctx.textAlign = 'center';
+            ctx.fillText('0', padding, height - padding + 20);
+            ctx.fillText(String(losses.length - 1), width - padding, height - padding + 20);
+        }
+
+        function probabilityToColor(prob) {
+            // Interpolate between blue (p=0) and red (p=1)
+            // Blue: RGB(33, 150, 243) -> Red: RGB(244, 67, 54)
+            const r = Math.round(33 + (244 - 33) * prob);
+            const g = Math.round(150 + (67 - 150) * prob);
+            const b = Math.round(243 + (54 - 243) * prob);
+            
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function worldToCanvasX(worldX, worldMin, worldMax, canvasWidth) {
+            const normalized = (worldX - worldMin) / (worldMax - worldMin);
+            return normalized * canvasWidth;
+        }
+
+        function worldToCanvasY(worldY, worldMin, worldMax, canvasHeight) {
+            // Flip Y axis (canvas Y increases downward)
+            const normalized = 1 - (worldY - worldMin) / (worldMax - worldMin);
+            return normalized * canvasHeight;
+        }
+    </script>
+</body>
+</html>

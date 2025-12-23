@@ -22,11 +22,11 @@ class Linear(Layer):
         # Xavier/Glorot uniform initialization
         # Limit: sqrt(6 / (fan_in + fan_out))
         limit = np.sqrt(6.0 / (in_features + out_features))
-        self.W = np.random.uniform(-limit, limit, (in_features, out_features))
+        self.W = np.random.uniform(-limit, limit, (in_features, out_features)).astype(np.float64)
         
         # Initialize bias to zero if present
         if bias:
-            self.b = np.zeros(out_features)
+            self.b = np.zeros(out_features, dtype=np.float64)
         else:
             self.b = None
         
@@ -36,6 +36,9 @@ class Linear(Layer):
         # Storage for gradients
         self.dW = None
         self.db = None
+        
+        # Flag to print diagnostics only once on first forward call
+        self._first_forward = True
     
     def forward(self, x: np.ndarray) -> np.ndarray:
         """
@@ -47,8 +50,20 @@ class Linear(Layer):
         Returns:
             Output tensor of shape (batch_size, out_features)
         """
+        # Print diagnostics on first forward call
+        if self._first_forward:
+            print(f"Linear.forward first call: x dtype={x.dtype}, max_abs={np.max(np.abs(x)):.6f}, "
+                  f"W dtype={self.W.dtype}, max_abs={np.max(np.abs(self.W)):.6f}")
+            self._first_forward = False
+        
         # Store input for backward pass
         self.x = x
+        
+        # Check for non-finite values immediately before matmul
+        if not np.all(np.isfinite(x)):
+            raise ValueError(f"NONFINITE X in Linear.forward: max_abs={np.nanmax(np.abs(x))}")
+        if not np.all(np.isfinite(self.W)):
+            raise ValueError(f"NONFINITE W in Linear.forward: max_abs={np.nanmax(np.abs(self.W))}")
         
         # Compute output: x @ W + b
         out = x @ self.W
@@ -67,6 +82,14 @@ class Linear(Layer):
         Returns:
             Gradient w.r.t. input, shape (batch_size, in_features)
         """
+        # Check for non-finite values before any matmul operations
+        if not np.all(np.isfinite(grad)):
+            raise ValueError("NONFINITE grad in Linear.backward")
+        if not np.all(np.isfinite(self.W)):
+            raise ValueError("NONFINITE W in Linear.backward")
+        if not np.all(np.isfinite(self.x)):
+            raise ValueError("NONFINITE x cache in Linear.backward")
+        
         # Gradient w.r.t. input: dx = dout @ W.T
         dx = grad @ self.W.T
         

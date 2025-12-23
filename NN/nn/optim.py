@@ -45,7 +45,7 @@ class Adam:
         self.eps = eps
         
         # Per-parameter state: m (first moment) and v (second moment)
-        # Keyed by id(param) to track each parameter array
+        # Keyed by id(param) to track each parameter array deterministically
         self.m: Dict[int, np.ndarray] = {}
         self.v: Dict[int, np.ndarray] = {}
         
@@ -55,6 +55,14 @@ class Adam:
     def step(self, params_and_grads: Generator[Tuple[np.ndarray, np.ndarray], None, None]) -> None:
         """
         Perform one Adam optimization step with bias correction.
+        
+        Canonical Adam formula:
+        t += 1
+        m = beta1*m + (1-beta1)*g
+        v = beta2*v + (1-beta2)*(g*g)
+        m_hat = m / (1 - beta1**t)
+        v_hat = v / (1 - beta2**t)
+        param[...] -= lr * m_hat / (sqrt(v_hat) + eps)
         
         Args:
             params_and_grads: Generator yielding (param, grad) tuples
@@ -66,23 +74,42 @@ class Adam:
         for param, grad in params_and_grads:
             param_id = id(param)
             
-            # Initialize state for new parameters
+            # Initialize state for new parameters: zeros_like(param) with dtype float64
             if param_id not in self.m:
-                self.m[param_id] = np.zeros_like(param)
-                self.v[param_id] = np.zeros_like(param)
+                self.m[param_id] = np.zeros_like(param, dtype=np.float64)
+                self.v[param_id] = np.zeros_like(param, dtype=np.float64)
             
-            # Update biased first moment estimate: m = beta1 * m + (1 - beta1) * g
-            self.m[param_id] = self.beta1 * self.m[param_id] + (1 - self.beta1) * grad
+            # Cast gradient to float64
+            g = grad.astype(np.float64, copy=False)
             
-            # Update biased second moment estimate: v = beta2 * v + (1 - beta2) * g^2
-            self.v[param_id] = self.beta2 * self.v[param_id] + (1 - self.beta2) * (grad ** 2)
+            # Check for non-finite gradients
+            if not np.isfinite(g).all():
+                raise ValueError("NONFINITE GRAD in Adam")
+            
+            # Update biased first moment: m = beta1*m + (1-beta1)*g
+            self.m[param_id] = self.beta1 * self.m[param_id] + (1 - self.beta1) * g
+            
+            # Update biased second moment: v = beta2*v + (1-beta2)*(g*g)
+            self.v[param_id] = self.beta2 * self.v[param_id] + (1 - self.beta2) * (g * g)
             
             # Bias correction
-            m_hat = self.m[param_id] / (1 - self.beta1 ** self.t)
-            v_hat = self.v[param_id] / (1 - self.beta2 ** self.t)
+            # Use max to prevent division by exactly 0 (though beta**t should never be 1.0)
+            beta1_t = self.beta1 ** self.t
+            beta2_t = self.beta2 ** self.t
+            denom1 = max(1.0 - beta1_t, 1e-10)
+            denom2 = max(1.0 - beta2_t, 1e-10)
             
-            # Update parameter: p -= lr * m_hat / (sqrt(v_hat) + eps)
-            param -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+            m_hat = self.m[param_id] / denom1
+            v_hat = self.v[param_id] / denom2
+            
+            # Ensure v_hat is positive (clip to prevent sqrt of negative)
+            v_hat = np.maximum(v_hat, 0.0)
+            
+            # Update parameter in-place: param[...] -= lr * m_hat / (sqrt(v_hat) + eps)
+            # Use np.maximum to ensure denominator is always positive
+            sqrt_v_hat = np.sqrt(v_hat)
+            denominator = np.maximum(sqrt_v_hat, self.eps)
+            param[...] -= self.lr * m_hat / denominator
 
 
 if __name__ == "__main__":
